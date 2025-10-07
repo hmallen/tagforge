@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # tagforge
 Minimal, cross-platform image annotation tool built for fast dataset creation in computer vision workflows.
 =======
@@ -58,4 +57,3 @@ py -m venv .venv
 - If the app doesn’t start, ensure the virtual environment is active and dependencies installed.
 - If no images are found, verify extensions and that the folder contains images directly (no subfolders processed).
 - If Albumentations errors on bboxes, ensure you have at least one valid box per image before augmenting.
->>>>>>> 22d386a (Initial commit)
