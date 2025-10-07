@@ -1,5 +1,6 @@
 import os
 import json
+import csv
 import shutil
 from pathlib import Path
 import tkinter as tk
@@ -48,6 +49,7 @@ class ImageAnnotatorApp(tk.Tk):
         ttk.Button(topbar, text="Prev", command=self.prev_image).pack(side=tk.LEFT, padx=4, pady=4)
         ttk.Button(topbar, text="Next", command=self.next_image).pack(side=tk.LEFT, padx=4, pady=4)
         ttk.Button(topbar, text="Save", command=self.save_all).pack(side=tk.LEFT, padx=4, pady=4)
+        ttk.Button(topbar, text="Import CSV", command=self.import_csv).pack(side=tk.LEFT, padx=4, pady=4)
         ttk.Button(topbar, text="Export YOLO", command=self.export_yolo).pack(side=tk.LEFT, padx=4, pady=4)
         ttk.Button(topbar, text="Export COCO", command=self.export_coco).pack(side=tk.LEFT, padx=4, pady=4)
         ttk.Button(topbar, text="Augment", command=self.augment_dialog).pack(side=tk.LEFT, padx=4, pady=4)
@@ -303,6 +305,57 @@ class ImageAnnotatorApp(tk.Tk):
         self.save_state()
         self.status_var.set("Saved")
         self.after(1200, lambda: self.status_var.set(""))
+
+    def import_csv(self):
+        if not self.image_paths:
+            messagebox.showerror("No images", "Open a folder with images before importing annotations.")
+            return
+        path = filedialog.askopenfilename(title="Select annotations CSV", filetypes=[("CSV files","*.csv"), ("All files","*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8-sig", newline="") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read CSV: {e}")
+            return
+        name_set = {p.name for p in self.image_paths}
+        new_annotations = {}
+        updated = set()
+        imported_boxes = 0
+        for r in rows:
+            fname = (r.get("filename") or "").strip()
+            if not fname or fname not in name_set:
+                continue
+            try:
+                width = int(float(r.get("width", "0") or 0))
+                height = int(float(r.get("height", "0") or 0))
+                xmin = int(float(r.get("xmin", "0") or 0))
+                ymin = int(float(r.get("ymin", "0") or 0))
+                xmax = int(float(r.get("xmax", "0") or 0))
+                ymax = int(float(r.get("ymax", "0") or 0))
+            except Exception:
+                continue
+            label = (r.get("class") or r.get("label") or "object").strip() or "object"
+            if label not in self.classes:
+                self.classes.append(label)
+                self.class_combo.configure(values=self.classes)
+            if width > 0 and height > 0:
+                self.image_sizes[fname] = {"width": width, "height": height}
+            new_annotations.setdefault(fname, [])
+            new_annotations[fname].append({"bbox": [int(xmin), int(ymin), int(xmax), int(ymax)], "label": label})
+            imported_boxes += 1
+            updated.add(fname)
+        for k, lst in new_annotations.items():
+            self.annotations[k] = lst
+        if not imported_boxes:
+            messagebox.showinfo("Import CSV", "No matching annotations were imported for the current image folder.")
+            return
+        self.refresh_boxes_list()
+        self.refresh_canvas()
+        self.save_state()
+        messagebox.showinfo("Import CSV", f"Imported {imported_boxes} boxes for {len(updated)} images.")
 
     def export_yolo(self):
         if not self.image_paths:
